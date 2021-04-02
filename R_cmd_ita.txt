@@ -1,0 +1,857 @@
+cases_raw<-read.csv("https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv")
+cases_filt = cases_raw[, c("data", "denominazione_regione", "terapia_intensiva", "variazione_totale_positivi", "totale_ospedalizzati", "totale_positivi", "tamponi", "deceduti")]
+
+cases_filt$Macroarea <- "Nord"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Campania"] <- "Sud"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Puglia"] <- "Sud"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Calabria"] <- "Sud"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Molise"] <- "Sud"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Basilicata"] <- "Sud"
+
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Abruzzo"] <- "Centro"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Lazio"] <- "Centro"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Marche"] <- "Centro"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Umbria"] <- "Centro"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Toscana"] <- "Centro"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Emilia-Romagna"] <- "Centro"
+
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Sardegna"] <- "Isole"
+cases_filt$"Macroarea"[cases_filt$"denominazione_regione"=="Sicilia"] <- "Isole"
+
+pop<-unique(cases_filt[, c("denominazione_regione", "Macroarea")])
+pop$popolazione <- 0
+
+pop$"popolazione"[pop$"denominazione_regione"=="Friuli Venezia Giulia"] <- 1.215
+pop$"popolazione"[pop$"denominazione_regione"=="Liguria"] <- 1.551
+pop$"popolazione"[pop$"denominazione_regione"=="Lombardia"] <- 10.06
+pop$"popolazione"[pop$"denominazione_regione"=="P.A. Bolzano"] <- 0.521
+pop$"popolazione"[pop$"denominazione_regione"=="P.A. Trento"] <- 0.538
+pop$"popolazione"[pop$"denominazione_regione"=="Piemonte"] <- 4.356
+pop$"popolazione"[pop$"denominazione_regione"=="Valle d'Aosta"] <- 0.126
+pop$"popolazione"[pop$"denominazione_regione"=="Veneto"] <- 4.906
+
+
+pop$"popolazione"[pop$"denominazione_regione"=="Campania"] <- 5.802
+pop$"popolazione"[pop$"denominazione_regione"=="Puglia"] <- 4.029
+pop$"popolazione"[pop$"denominazione_regione"=="Calabria"] <- 1.947
+pop$"popolazione"[pop$"denominazione_regione"=="Molise"] <- 0.306
+pop$"popolazione"[pop$"denominazione_regione"=="Basilicata"] <- 0.563
+
+pop$"popolazione"[pop$"denominazione_regione"=="Abruzzo"] <- 1.312
+pop$"popolazione"[pop$"denominazione_regione"=="Lazio"] <- 5.879
+pop$"popolazione"[pop$"denominazione_regione"=="Marche"] <- 1.525
+pop$"popolazione"[pop$"denominazione_regione"=="Umbria"] <- 0.882
+pop$"popolazione"[pop$"denominazione_regione"=="Toscana"] <- 3.73
+pop$"popolazione"[pop$"denominazione_regione"=="Emilia-Romagna"] <- 4.459
+
+pop$"popolazione"[pop$"denominazione_regione"=="Sardegna"] <- 1.64
+pop$"popolazione"[pop$"denominazione_regione"=="Sicilia"] <- 4.956
+
+
+
+cases_filt_sud<-subset(cases_filt, grepl("Campania|Puglia|Calabria|Basilicata|Molise", cases_filt$denominazione_regione))
+cases_filt_nord<-subset(cases_filt, grepl("Lombardia|Piemonte|Veneto|Valle d'Aosta|Friuli Venezia Giulia|Liguria|P.A. Trento|P.A. Bolzano", cases_filt$denominazione_regione))
+cases_filt_centro<-subset(cases_filt, grepl("Marche|Umbria|Emilia-Romagna|Lazio|Abruzzo|Toscana", cases_filt$denominazione_regione))
+cases_filt_isole<-subset(cases_filt, grepl("Sardegna|Sicilia", cases_filt$denominazione_regione))
+
+cases_filt_macro<-cases_filt
+cases_filt_macro$denominazione_regione<-NULL
+tot3<-aggregate(. ~ data+Macroarea, cases_filt_macro, sum)
+tot3$data<-as.Date(tot3$data)
+
+tot5<-tot3
+tot5$Macroarea<-NULL
+tot5agg<-aggregate(. ~ data, tot5, sum)
+popmacro<-aggregate(popolazione ~ Macroarea, pop, sum)
+cases_filt_m <- merge(cases_filt, pop, by.x="denominazione_regione",by.y="denominazione_regione")
+cases_filt_m$data<-as.Date(cases_filt_m$data)
+cases_filt_m<-cases_filt_m[order(as.Date(cases_filt_m$data)), ]
+
+tamp_data<-data.frame()
+for(regione in pop$denominazione_regione){
+	reg_tamp<-as.data.frame(diff(cases_filt_m[cases_filt_m$"denominazione_regione"==regione, ]$tamponi)	)
+	row.names(reg_tamp)<-tail(row.names(cases_filt_m[cases_filt_m$"denominazione_regione"==regione, ]), -1)
+	colnames(reg_tamp)<-c("diff_tamponi")
+	tamp_data<-rbind(tamp_data, reg_tamp, stringsAsFactors = FALSE, make.row.names=TRUE)
+#	cases_filt_m<-rbind.fill(cases_filt_m, reg_tamp)
+}
+
+death_data<-data.frame()
+for(regione in pop$denominazione_regione){
+	reg_death<-as.data.frame(diff(cases_filt_m[cases_filt_m$"denominazione_regione"==regione, ]$deceduti)	)
+	row.names(reg_death)<-tail(row.names(cases_filt_m[cases_filt_m$"denominazione_regione"==regione, ]), -1)
+	colnames(reg_death)<-c("diff_decessi")
+	death_data<-rbind(death_data, reg_death, stringsAsFactors = FALSE, make.row.names=TRUE)
+#	cases_filt_m<-rbind.fill(cases_filt_m, reg_tamp)
+}
+
+for(regione in pop$denominazione_regione){
+	reg_tamp<-as.data.frame(diff(cases_filt_m[cases_filt_m$"denominazione_regione"==regione, ]$tamponi)	)
+	row.names(reg_tamp)<-tail(row.names(cases_filt_m[cases_filt_m$"denominazione_regione"==regione, ]), -1)
+	colnames(reg_tamp)<-c("diff_tamponi")
+	tamp_data<-rbind(tamp_data, reg_tamp, stringsAsFactors = FALSE, make.row.names=TRUE)
+#	cases_filt_m<-rbind.fill(cases_filt_m, reg_tamp)
+}
+
+require(plyr) # requires plyr for rbind.fill()
+cbind.fill <- function(...) {                                                                                                                                                       
+  transpoted <- lapply(list(...),t)                                                                                                                                                 
+  transpoted_dataframe <- lapply(transpoted, as.data.frame)                                                                                                                         
+  return (data.frame(t(rbind.fill(transpoted_dataframe))))                                                                                                                          
+} 
+
+cases_filt_m_b<-cbind.fill(cases_filt_m, tamp_data)
+names(cases_filt_m_b)<-c(names(cases_filt_m), "diff_tamp")
+
+cases_filt_m2<-cbind.fill(cases_filt_m_b, death_data)
+names(cases_filt_m2)<-c(names(cases_filt_m_b), "diff_decessi")
+
+cases_filt_m2$data<-as.Date(cases_filt_m2$data)
+
+cases_filt_m2$diff_decessi<-as.numeric(as.character(cases_filt_m2$diff_decessi))
+cases_filt_m2$diff_tamp<-as.numeric(as.character(cases_filt_m2$diff_tamp))
+cases_filt_m2$totale_ospedalizzati<-as.numeric(as.character(cases_filt_m2$totale_ospedalizzati))
+cases_filt_m2$totale_positivi<-as.numeric(as.character(cases_filt_m2$totale_positivi))
+cases_filt_m2$terapia_intensiva<-as.numeric(as.character(cases_filt_m2$terapia_intensiva))
+cases_filt_m2$popolazione<-as.numeric(as.character(cases_filt_m2$popolazione))
+
+cases_filt_m2$osp1M<-cases_filt_m2$totale_ospedalizzati/cases_filt_m2$popolazione
+cases_filt_m2$pos1M<-cases_filt_m2$totale_positivi/cases_filt_m2$popolazione
+cases_filt_m2$ter1M<-cases_filt_m2$terapia_intensiva/cases_filt_m2$popolazione
+
+for(regione in pop$denominazione_regione){
+    cases_filt_m2$maxOsp[cases_filt_m2$"denominazione_regione"==regione] = max(cases_filt_m2$totale_ospedalizzati[cases_filt_m2$"denominazione_regione"==regione][0:100])
+    cases_filt_m2$maxPos[cases_filt_m2$"denominazione_regione"==regione] = max(cases_filt_m2$totale_positivi[cases_filt_m2$"denominazione_regione"==regione][0:100])
+    cases_filt_m2$maxTI[cases_filt_m2$"denominazione_regione"==regione] = max(cases_filt_m2$terapia_intensiva[cases_filt_m2$"denominazione_regione"==regione][0:100])
+    cases_filt_m2$maxTamp[cases_filt_m2$"denominazione_regione"==regione] = max(cases_filt_m2$diff_tamp[cases_filt_m2$"denominazione_regione"==regione][0:100], na.rm = TRUE)
+    cases_filt_m2$maxDeath[cases_filt_m2$"denominazione_regione"==regione] = max(cases_filt_m2$diff_decessi[cases_filt_m2$"denominazione_regione"==regione][0:100], na.rm = TRUE)
+}
+
+tot4<-merge(tot3, popmacro, by.x="Macroarea",by.y="Macroarea")
+
+for(one_macroarea in popmacro$Macroarea){
+    tot4$maxOsp[tot4$"Macroarea"==one_macroarea] = max(tot4$totale_ospedalizzati[tot4$"Macroarea"==one_macroarea])
+    tot4$maxPos[tot4$"Macroarea"==one_macroarea] = max(tot4$totale_positivi[tot4$"Macroarea"==one_macroarea])
+    tot4$maxTI[tot4$"Macroarea"==one_macroarea] = max(tot4$terapia_intensiva[tot4$"Macroarea"==one_macroarea])
+   # tot4$maxDec[tot4$"Macroarea"==one_macroarea] = max(tot4$deceduti[tot4$"Macroarea"==one_macroarea])
+}
+
+library(ggplot2) 
+library(directlabels)
+library(ggrepel)
+library(scales)
+
+
+cases_filt_all<- aggregate(. ~ data, cases_filt_m2, sum)
+
+
+sud_data<-subset(cases_filt_m2, Macroarea.x %in% c("Isole", "Sud"))
+png("terapie_int_SI.png", width=1000)
+ggplot(data=sud_data, aes(x=data, y=terapia_intensiva, group=denominazione_regione)) +
+  geom_line(aes(color=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_text_repel(data = sud_data[sud_data$data==max(sud_data$data), ], aes(label=paste0(round(terapia_intensiva/maxTI*100, 1), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  labs(y="Terapie intensive")
+ dev.off()
+ 
+png("ospedalizz_SI.png", width=1000)
+ggplot(data=sud_data, aes(x=data, y=totale_ospedalizzati, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  geom_text_repel(data = sud_data[sud_data$data==max(sud_data$data), ], aes(label=paste0(round(totale_ospedalizzati/maxOsp*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  labs(y="Ospedalizzati")
+ dev.off()
+
+
+png("positives_SI.png", width=1000)
+ggplot(data=sud_data, aes(x=data, y=totale_positivi, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  geom_text_repel(data = sud_data[sud_data$data==max(sud_data$data), ], aes(label=paste0(round(totale_positivi/maxPos*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  #xlim(c(as.Date("2020-08-01"), tail(sud_data$data, n=1))) +
+  #geom_vline(xintercept = sud_data$data[1492]) + 
+  #geom_vline(xintercept = sud_data$data[1541]) + 
+  labs(y="Positivi")
+ dev.off()
+ 
+library(zoo)
+
+png("death_SI.png", width=1000)
+ggplot(data=sud_data, aes(x=data, y=diff_decessi, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  geom_text_repel(data = sud_data[sud_data$data==max(sud_data$data), ], aes(label=paste0(round(diff_decessi/maxDeath*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  #xlim(c(as.Date("2020-08-01"), tail(sud_data$data, n=1))) +
+  #geom_vline(xintercept = sud_data$data[1492]) + 
+  #geom_vline(xintercept = sud_data$data[1541]) + 
+  scale_y_continuous(trans = 'log2') +
+  labs(y="Decessi")
+ dev.off()
+
+png("tamponi_SI.png", width=1000)
+ggplot(data=sud_data, aes(x=data, y=diff_tamp, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  #geom_text_repel(data = sud_data2[sud_data2$data==max(sud_data2$data), ], aes(label=paste0(round(diff_tamp/maxTamp*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  #xlim(c(as.Date("2020-08-01"), tail(sud_data$data, n=1))) +
+  #geom_vline(xintercept = sud_data$data[1492]) + 
+  #geom_vline(xintercept = sud_data$data[1541]) + 
+  labs(y="Tamponi")
+ dev.off()
+ 
+lomb_data<-subset(cases_filt_m2, denominazione_regione %in% c("Lombardia"))
+
+library(lubridate)
+bymonth_lomb <- aggregate(cbind(terapia_intensiva,totale_ospedalizzati,totale_positivi,diff_decessi)~month(data),
+             data=lomb_data,FUN=sum)
+
+bymonth_lomb2 <- aggregate(cbind(terapia_intensiva,totale_ospedalizzati,totale_positivi,diff_decessi)~month(data),
+             data=lomb_data,max)
+             
+row.names(bymonth_lomb)<-month.abb[bymonth_lomb[,1]]
+bymonth_lomb[,1]<-NULL
+row.names(bymonth_lomb2)<-month.abb[bymonth_lomb2[,1]]
+bymonth_lomb2[,1]<-NULL
+
+png("LOMB_bar.png", width=1000)
+
+par(mfrow = c(1:2))
+barplot(as.matrix(t(bymonth_lomb2[,c(1,2)])), beside=T, main="Massimo valore per mese in Lombardia", col=c("blue", "green"), legend.text=c("TI", "Ospedalizzazioni"), args.legend = list(x = "topleft"))
+barplot(as.matrix(t(bymonth_lomb[ ,c(4), drop=FALSE])), beside=T, main="Decessi in Lombardia", col=c("black"))
+
+dev.off()
+
+lomb4<-ggplot(data=lomb_data, aes(x=data, y=rollmean(diff_decessi, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  theme_classic() +
+  labs(y="Decessi")
+
+lomb1<-ggplot(data=lomb_data, aes(x=data, y=rollmean(totale_positivi, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  theme_classic() +
+  labs(y="Positivi")
+  
+lomb2<-ggplot(data=lomb_data, aes(x=data, y=rollmean(totale_ospedalizzati, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +  theme_classic() +
+   labs(y="Ospedalizzati")
+
+lomb3<-ggplot(data=lomb_data, aes(x=data, y=rollmean(terapia_intensiva, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  theme_classic() +
+  labs(y="Terapie intensive")
+
+
+library(gridExtra)
+
+png("LOMB_all.png", width=1000)
+grid.arrange(grobs = list(lomb1,lomb2,lomb3,lomb4), ncol = 2, as.table = TRUE)
+dev.off()
+
+
+
+
+
+camp_data<-subset(cases_filt_m2, denominazione_regione %in% c("Campania"))
+
+library(lubridate)
+bymonth_camp <- aggregate(cbind(terapia_intensiva,totale_ospedalizzati,totale_positivi,diff_decessi)~month(data)+year(data),
+             data=camp_data,FUN=sum)
+
+bymonth_camp2 <- aggregate(cbind(terapia_intensiva,totale_ospedalizzati,totale_positivi,diff_decessi)~month(data)+year(data),
+             data=camp_data,max)
+             
+row.names(bymonth_camp)<-paste(month.abb[bymonth_camp[,1]], bymonth_camp[,2], sep="-")
+bymonth_camp[,1]<-NULL
+bymonth_camp[,2]<-NULL
+row.names(bymonth_camp2)<-paste(month.abb[bymonth_camp2[,1]], bymonth_camp2[,2], sep="-")
+bymonth_camp2[,1]<-NULL
+bymonth_camp2[,2]<-NULL
+
+png("CAMP_bar.png", width=1000)
+
+par(mfrow = c(1:2))
+barplot(as.matrix(t(bymonth_camp2[,c(1,2)])), beside=T, main="Massimo valore per mese in Campania", col=c("blue", "green"), legend.text=c("TI", "Ospedalizzazioni"), args.legend = list(x = "topleft"))
+barplot(as.matrix(t(bymonth_camp[ ,c(4), drop=FALSE])), beside=T, main="Decessi in Campania", col=c("black"))
+
+dev.off()
+
+
+
+
+
+png("tamponi_CAMP.png", width=1000)
+ggplot(data=camp_data, aes(x=data, y=rollmean(diff_tamp, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  theme_classic() +
+  labs(y="Tamponi")
+ dev.off()
+
+camp4<-ggplot(data=camp_data, aes(x=data, y=rollmean(diff_decessi, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  theme_classic() +
+  labs(y="Decessi")
+
+camp1<-ggplot(data=camp_data, aes(x=data, y=rollmean(totale_positivi, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  theme_classic() +
+  labs(y="Positivi")
+  
+camp2<-ggplot(data=camp_data, aes(x=data, y=rollmean(totale_ospedalizzati, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +  theme_classic() +
+   labs(y="Ospedalizzati")
+
+camp3<-ggplot(data=camp_data, aes(x=data, y=rollmean(terapia_intensiva, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  theme_classic() +
+  labs(y="Terapie intensive")
+
+
+library(gridExtra)
+
+png("CAMP_all.png", width=1000)
+grid.arrange(grobs = list(camp1,camp2,camp3,camp4), ncol = 2, as.table = TRUE)
+dev.off()
+
+ita4<-ggplot(data=cases_filt_all, aes(x=data, y=rollmean(diff_decessi, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(color="black") +
+  theme_classic() +
+  labs(y="Decessi")
+
+ita1<-ggplot(data=cases_filt_all, aes(x=data, y=rollmean(totale_positivi, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(color="red") +
+  theme_classic() +
+  labs(y="Positivi")
+  
+ita2<-ggplot(data=cases_filt_all, aes(x=data, y=rollmean(totale_ospedalizzati, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(color="green") +  theme_classic() +
+   labs(y="Ospedalizzati")
+
+ita3<-ggplot(data=cases_filt_all, aes(x=data, y=rollmean(terapia_intensiva, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(color="blue") +
+  theme_classic() +
+  labs(y="Terapie intensive")
+
+
+ita4b<-ggplot(data=cases_filt_all, aes(x=data, y=rollmean(diff_decessi, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(color="black") +
+  theme_classic() +
+  xlim(c(as.Date("2020-09-01"), tail(cases_filt_all$data, n=1))) +
+  labs(y="Decessi")
+
+ita1b<-ggplot(data=cases_filt_all, aes(x=data, y=rollmean(totale_positivi, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(color="red") +
+  theme_classic() +
+  xlim(c(as.Date("2020-09-01"), tail(cases_filt_all$data, n=1))) +
+  labs(y="Positivi")
+  
+ita2b<-ggplot(data=cases_filt_all, aes(x=data, y=rollmean(totale_ospedalizzati, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(color="green") +  theme_classic() +
+  xlim(c(as.Date("2020-09-01"), tail(cases_filt_all$data, n=1))) +
+   labs(y="Ospedalizzati")
+
+ita3b<-ggplot(data=cases_filt_all, aes(x=data, y=rollmean(terapia_intensiva, 7, na.pad=TRUE), group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(color="blue") +
+  theme_classic() +
+  xlim(c(as.Date("2020-09-01"), tail(cases_filt_all$data, n=1))) +
+  labs(y="Terapie intensive")
+
+library(gridExtra)
+library(grid)
+
+png("ita_all_sec.png", width=1000)
+grid.arrange(grobs = list(ita1b,ita2b,ita3b,ita4b), ncol = 2, as.table = TRUE,  top = textGrob("Covid19 in Italy, second wave",gp=gpar(fontsize=20,font=3)))
+dev.off()
+
+png("ita_all.png", width=1000)
+grid.arrange(grobs = list(ita1,ita2,ita3,ita4), ncol = 2, as.table = TRUE,  top = textGrob("Covid19 in Italy",gp=gpar(fontsize=20,font=3)))
+dev.off()
+
+
+
+
+
+nord_data<-subset(cases_filt_m2, Macroarea.x %in% c("Nord"))
+png("terapie_int_N.png", width=1000)
+ggplot(data=nord_data, aes(x=data, y=terapia_intensiva, group=denominazione_regione)) +
+  geom_line(aes(color=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_text_repel(data = nord_data[nord_data$data==max(nord_data$data), ], aes(label=paste0(round(terapia_intensiva/maxTI*100, 1), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  #scale_y_continuous(trans = 'log2')  + 
+  labs(y="Terapie intensive")
+ dev.off()
+ 
+png("ospedalizz_N.png", width=1000)
+ggplot(data=nord_data, aes(x=data, y=totale_ospedalizzati, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  geom_text_repel(data = nord_data[nord_data$data==max(nord_data$data), ], aes(label=paste0(round(totale_ospedalizzati/maxOsp*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  scale_y_continuous(trans = 'log2')  + 
+  labs(y="Ospedalizzati")
+ dev.off()
+
+png("positives_N.png", width=1000)
+ggplot(data=nord_data, aes(x=data, y=totale_positivi, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  geom_text_repel(data = nord_data[nord_data$data==max(nord_data$data), ], aes(label=paste0(round(totale_positivi/maxPos*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  scale_y_continuous(trans = 'log2')  + 
+  labs(y="Positivi")
+ dev.off()
+ 
+png("death_N.png", width=1000)
+ggplot(data=nord_data, aes(x=data, y=diff_decessi, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  geom_text_repel(data = sud_data[sud_data$data==max(sud_data$data), ], aes(label=paste0(round(diff_decessi/maxDeath*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  #xlim(c(as.Date("2020-08-01"), tail(sud_data$data, n=1))) +
+  #geom_vline(xintercept = sud_data$data[1492]) + 
+  #geom_vline(xintercept = sud_data$data[1541]) + 
+  scale_y_continuous(trans = 'log2') +
+  labs(y="Decessi")
+ dev.off()
+  
+centro_data<-subset(cases_filt_m2, Macroarea.x %in% c("Centro"))
+png("terapie_int_C.png", width=1000)
+ggplot(data=centro_data, aes(x=data, y=terapia_intensiva, group=denominazione_regione)) +
+  geom_line(aes(color=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_text_repel(data = centro_data[centro_data$data==max(centro_data$data), ], aes(label=paste0(round(terapia_intensiva/maxTI*100, 1), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  labs(y="Terapie intensive")
+ dev.off()
+ 
+png("ospedalizz_C.png", width=1000)
+ggplot(data=centro_data, aes(x=data, y=totale_ospedalizzati, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  geom_text_repel(data = centro_data[centro_data$data==max(centro_data$data), ], aes(label=paste0(round(totale_ospedalizzati/maxOsp*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  labs(y="Ospedalizzati")
+ dev.off()
+
+png("positives_C.png", width=1000)
+ggplot(data=centro_data, aes(x=data, y=totale_positivi, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  geom_text_repel(data = centro_data[centro_data$data==max(centro_data$data), ], aes(label=paste0(round(totale_positivi/maxPos*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  labs(y="Positivi")
+ dev.off()
+
+png("death_C.png", width=1000)
+ggplot(data=centro_data, aes(x=data, y=diff_decessi, group=denominazione_regione)) +
+  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+  geom_line(aes(color=denominazione_regione)) +
+  geom_text_repel(data = sud_data[sud_data$data==max(sud_data$data), ], aes(label=paste0(round(diff_decessi/maxDeath*100, 0), " %")), direction="y", hjust = -0.5) +
+  theme_classic() +
+  #xlim(c(as.Date("2020-08-01"), tail(sud_data$data, n=1))) +
+  #geom_vline(xintercept = sud_data$data[1492]) + 
+  #geom_vline(xintercept = sud_data$data[1541]) + 
+  scale_y_continuous(trans = 'log2') +
+  labs(y="Decessi")
+ dev.off()
+
+maxTI_day<-as.Date(tot5agg[tot5agg$terapia_intensiva==max(tot5agg$terapia_intensiva), ]$data)
+lock_day<-as.Date("2020-03-09")
+last_day<-as.Date(max(cases_filt_m$data))
+last_day_data<-cases_filt_m[cases_filt_m$data==last_day, ]
+lock_data<-cases_filt_m[cases_filt_m$data==lock_day, ]
+maxTI_data<-cases_filt_m[cases_filt_m$data==maxTI_day, ]
+
+diff_from_peak<-last_day_data
+diff_from_peak$terapia_intensiva<- last_day_data$terapia_intensiva- maxTI_data$terapia_intensiva
+diff_from_peak$totale_ospedalizzati<- last_day_data$totale_ospedalizzati - maxTI_data$totale_ospedalizzati
+diff_from_peak$totale_positivi<- last_day_data$totale_positivi - maxTI_data$totale_positivi
+diff_from_peak$deceduti<- last_day_data$deceduti - maxTI_data$deceduti
+
+diff_from_lock<-last_day_data
+diff_from_lock$terapia_intensiva<- last_day_data$terapia_intensiva- lock_data$terapia_intensiva
+diff_from_lock$totale_ospedalizzati<- last_day_data$totale_ospedalizzati - lock_data$totale_ospedalizzati
+diff_from_lock$totale_positivi<- last_day_data$totale_positivi - lock_data$totale_positivi
+diff_from_lock$deceduti<- last_day_data$deceduti - lock_data$deceduti
+
+library(ggplot2)
+
+makeDatForPicture <- function(day_data) {                                                                                                                                                      
+	positives_regions_raw<-day_data[, c("denominazione_regione", "totale_positivi", "totale_ospedalizzati", "terapia_intensiva", "popolazione")]
+	trentino_raw<-subset(positives_regions_raw, denominazione_regione %in% c("P.A. Bolzano", "P.A. Trento"))
+	trentino_raw$denominazione_regione<-NULL
+	trentino<-as.data.frame(t(colSums(trentino_raw)))
+	trentino$denominazione_regione<-"Trentino-Alto Adige"
+	positives_regions_b<-rbind(positives_regions_raw, trentino)
+	positives_regions<-as.data.frame(subset(positives_regions_b, !(denominazione_regione %in% c("P.A. Bolzano", "P.A. Trento"))))
+
+	positives_regions$percPos <- positives_regions$totale_positivi/positives_regions$popolazione
+	positives_regions$percOsp <- positives_regions$totale_ospedalizzati/positives_regions$popolazione
+	positives_regions$percTI <- positives_regions$terapia_intensiva/positives_regions$popolazione
+
+	library(ggplot2)
+	library(ggmap)
+	library(maps)
+	library(mapdata)
+	library(raster)
+	library(tidyverse)
+
+	italy <- getData('GADM', country='Italy', level=1)
+	italy$name = italy$NAME_1
+
+	italy$name<-c("Abruzzo", "Puglia", "Basilicata",          
+	"Calabria", "Campania",  "Emilia-Romagna",
+	"Friuli Venezia Giulia", "Lazio", "Liguria", 
+	"Lombardia", "Marche", "Molise", "Piemonte",
+	"Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria",          
+	"Valle d'Aosta", "Veneto")
+
+	regions <- map_data(italy)
+	positives_regions_or<-positives_regions[match(italy$name, positives_regions$denominazione_regione),]
+	positives_regions_or[, "denominazione_regione"]<-as.vector(positives_regions_or[, "denominazione_regione"])
+	names(positives_regions_or)<-c("region", "totale_positivi", "totale_ospedalizzati", "terapia_intensiva", "popolazione", "positivi_per_milione", "ospedalizzati_per_milione", "terapie_intensive_per_milione")
+	regions_data <- left_join(regions, positives_regions_or, by="region")
+
+	return(regions_data)
+} 
+
+regions_data<-makeDatForPicture(last_day_data)
+regions_data_max<-makeDatForPicture(maxTI_data)
+regions_data_lock<-makeDatForPicture(lock_data)
+regions_diff_lock<-makeDatForPicture(diff_from_lock)
+regions_diff_peak<-makeDatForPicture(diff_from_peak)
+
+library(gridExtra)
+plot1<-ggplot(data = regions_data_max) + 
+  ggtitle(paste("Numero di positivi per milione di abitanti", maxTI_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = positivi_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data_max$positivi_per_milione)), low="white",high="red") +
+  theme_void()
+
+plot1b<-ggplot(data = regions_data_max) + 
+  ggtitle(paste("Numero di positivi per milione di abitanti", maxTI_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = positivi_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data$positivi_per_milione)), low="white",high="red") +
+  theme_void()
+
+plot2<-ggplot(data = regions_data) + 
+  ggtitle(paste("Numero di positivi per milione di abitanti", last_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = positivi_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data$positivi_per_milione)), low="white",high="red") +
+  theme_void()
+
+plot3<-ggplot(data = regions_data_max) + 
+  ggtitle(paste("Numero di ospedalizzati per milione di abitanti", maxTI_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = ospedalizzati_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data_max$ospedalizzati_per_milione)), low="white",high="green") +
+  theme_void()
+
+plot4<-ggplot(data = regions_data) + 
+  ggtitle(paste("Numero di ospedalizzati per milione di abitanti", last_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = ospedalizzati_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data$ospedalizzati_per_milione)), low="white",high="green") +
+  theme_void()
+
+plotospsc<-ggplot(data = regions_data) + 
+  ggtitle(paste("Numero di ospedalizzati per milione di abitanti", last_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = ospedalizzati_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data_max$ospedalizzati_per_milione)), low="white",high="green") +
+  theme_void()
+
+plot5<-ggplot(data = regions_data_max) + 
+  ggtitle(paste("Numero di terapie intensive per milione di abitanti", maxTI_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = terapie_intensive_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data_max$terapie_intensive_per_milione)), low="white",high="blue") +
+  theme_void()
+
+plot6<-ggplot(data = regions_data) + 
+  ggtitle(paste("Numero di terapie intensive per milione di abitanti", last_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = terapie_intensive_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data$terapie_intensive_per_milione)), low="white",high="blue") +
+  theme_void()
+  
+plot6b<-ggplot(data = regions_data) + 
+  ggtitle(paste("Numero di terapie intensive per milione di abitanti", last_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = terapie_intensive_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data_max$terapie_intensive_per_milione)), low="white",high="blue") +
+  theme_void()
+
+list1<-list(plot1, plot3, plot5)
+list2<-list(plot2, plot4, plot6)
+
+list3<-list(plot1, plot3, plot5)
+list4<-list(plot2, plotospsc, plot6b)
+
+#png("itas.png", width=1500, height=1000)
+#grid.arrange(grobs = c(list1, list2), ncol = 2, as.table = FALSE)
+#dev.off()
+
+png("itas_onesc.png", width=1500, height=1000)
+grid.arrange(grobs = c(list3, list4), ncol = 2, as.table = FALSE)
+dev.off()
+
+paste("max osp is", max(regions_data$ospedalizzati_per_milione))
+paste("max TI is", max(regions_data$terapie_intensive_per_milione))
+
+plotA1<-ggplot(data = regions_data_lock) + 
+  ggtitle(paste("Numero di positivi per milione di abitanti", lock_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = positivi_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data_lock$positivi_per_milione)), low="white",high="red") +
+  theme_void()
+
+plotA2<-ggplot(data = regions_data) + 
+  ggtitle(paste("Numero di positivi per milione di abitanti", last_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = positivi_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data$positivi_per_milione)), low="white",high="red") +
+  theme_void()
+
+plotB1<-ggplot(data = regions_data_lock) + 
+  ggtitle(paste("Numero di ospedalizzati per milione di abitanti", lock_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = ospedalizzati_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, 500), low="white",high="green") +
+  theme_void()
+
+plotB2<-ggplot(data = regions_data) + 
+  ggtitle(paste("Numero di ospedalizzati per milione di abitanti", last_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = ospedalizzati_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  #scale_fill_continuous(limits=c(0, 500,1000), low="white", high="green") +
+   scale_fill_gradientn(colors=c("white","green","gray","black"),
+   values=rescale(c(0,500,501,1500)),
+   limits=c(0,1500)) +
+   theme_void()
+
+plotC1<-ggplot(data = regions_data_lock) + 
+  ggtitle(paste("Numero di terapie intensive per milione di abitanti", lock_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = terapie_intensive_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_continuous(limits=c(0, max(regions_data_lock$terapie_intensive_per_milione)), low="white",high="blue") +
+  theme_void()
+
+plotC2<-ggplot(data = regions_data) + 
+  ggtitle(paste("Numero di terapie intensive per milione di abitanti", last_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = terapie_intensive_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+   scale_fill_gradientn(colors=c("white","blue","gray","black"),
+   values=rescale(c(0,max(regions_data_lock$terapie_intensive_per_milione),max(regions_data_lock$terapie_intensive_per_milione)+1,max(regions_data_lock$terapie_intensive_per_milione)*4)),
+   limits=c(0,max(regions_data_lock$terapie_intensive_per_milione)*4)) +  
+  #scale_fill_continuous(limits=c(0, max(regions_data_lock$terapie_intensive_per_milione)), low="white",high="blue") +
+  theme_void()
+
+list5<-list(plotA1, plotB1, plotC1)
+list6<-list(plotA2, plotB2, plotC2)
+
+png("ita_locks.png", width=1500, height=1000)
+grid.arrange(grobs = c(list5, list6), ncol = 2, as.table = FALSE)
+dev.off()
+
+max_diff_lock_ti<-ceiling(max(c(max(regions_diff_lock$terapie_intensive_per_milione), -min(regions_diff_lock$terapie_intensive_per_milione))))
+max_diff_lock_osp<-ceiling(max(c(max(regions_diff_lock$ospedalizzati_per_milione), -min(regions_diff_lock$ospedalizzati_per_milione))))
+max_diff_peak_ti<-ceiling(max(c(max(regions_diff_peak$terapie_intensive_per_milione), -min(regions_diff_peak$terapie_intensive_per_milione))))
+max_diff_peak_osp<-ceiling(max(c(max(regions_diff_peak$ospedalizzati_per_milione), -min(regions_diff_peak$ospedalizzati_per_milione))))
+
+max_diff_lock_ti
+max_diff_lock_osp
+max_diff_peak_ti
+max_diff_peak_osp
+
+plot_diff_lock1<-ggplot(data = regions_diff_lock) + 
+  ggtitle(paste("Differenza", last_day, "/", lock_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = ospedalizzati_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_gradientn(colours=c("green","white","red"), values  = rescale(c(-max_diff_lock_osp, 0, max_diff_lock_osp)), guide = "colorbar", limits=c(-max_diff_lock_osp,max_diff_lock_osp)) + 
+  theme_void()
+ 
+plot_diff_lock2<-ggplot(data = regions_diff_lock) + 
+  ggtitle(paste("Differenza", last_day, "/", lock_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = terapie_intensive_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_gradientn(colours=c("green","white","red"), values  = rescale(c(-max_diff_lock_ti, 0, max_diff_lock_ti)), guide = "colorbar", limits=c(-max_diff_lock_ti,max_diff_lock_ti)) + 
+  theme_void()
+
+plot_diff_peak1<-ggplot(data = regions_diff_peak) + 
+  ggtitle(paste("Differenza", last_day, "/", maxTI_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = ospedalizzati_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_gradientn(colours=c("green","white","red"), values  = rescale(c(-max_diff_peak_osp, 0, max_diff_peak_osp)), guide = "colorbar", limits=c(-max_diff_peak_osp,max_diff_peak_osp)) + 
+  theme_void()
+ 
+plot_diff_peak2<-ggplot(data = regions_diff_peak) + 
+  ggtitle(paste("Differenza", last_day, "/", maxTI_day, sep=" ")) +
+  geom_polygon(aes(x = long, y = lat, fill = terapie_intensive_per_milione, group = group), color = "black") + 
+  coord_fixed(1.3) +
+  scale_fill_gradientn(colours=c("green","white","red"), values  = rescale(c(-max_diff_peak_ti, 0, max_diff_peak_ti)), guide = "colorbar", limits=c(-max_diff_peak_ti,max_diff_peak_ti)) + 
+  theme_void()
+
+
+#list7<-list(plot_diff_lock1, plot_diff_peak1)
+list8<-list(plot_diff_peak1, plot_diff_peak2)
+
+
+png("ita_diffs.png", width=1500, height=1000)
+grid.arrange(grobs = c(list8), ncol = 2, as.table = FALSE)
+dev.off()
+
+
+
+
+reg_list<-list()
+
+for(regione in pop$denominazione_regione){
+	reg_data<-subset(cases_filt_m2, denominazione_regione %in% c(regione))
+	reg_list[[regione]] <- ggplot(data=reg_data, aes(x=data, y=rollmean(diff_decessi, 7, na.pad=TRUE), group=denominazione_regione)) +
+	  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+	  geom_line(aes(color=denominazione_regione)) +
+	  #geom_text_repel(data = camp_data[camp_data$data==max(camp_data$data), ], aes(label=paste0(round(diff_decessi/maxDeath*100, 0), " %")), direction="y", hjust = -0.5) +
+	  theme_classic() +
+	  #xlim(c(as.Date("2020-08-01"), tail(sud_data$data, n=1))) +
+	  #geom_vline(xintercept = sud_data$data[1492]) + 
+	  #geom_vline(xintercept = sud_data$data[1541]) + 
+	  labs(y="Decessi")
+}
+
+library(gridExtra)
+
+png("death_all.png", width=2000)
+grid.arrange(grobs = reg_list, ncol = 5, as.table = TRUE)
+dev.off()
+
+reg_list2<-list()
+
+for(regione in pop$denominazione_regione){
+	reg_data<-subset(cases_filt_m2, denominazione_regione %in% c(regione))
+	reg_list2[[regione]] <- ggplot(data=reg_data, aes(x=data, y=rollmean(osp1M, 7, na.pad=TRUE), group=denominazione_regione)) +
+	  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+	  geom_line(aes(color=denominazione_regione)) +
+	  #geom_text_repel(data = camp_data[camp_data$data==max(camp_data$data), ], aes(label=paste0(round(diff_decessi/maxDeath*100, 0), " %")), direction="y", hjust = -0.5) +
+	  theme_classic() +
+	  #xlim(c(as.Date("2020-08-01"), tail(sud_data$data, n=1))) +
+	  #geom_vline(xintercept = sud_data$data[1492]) + 
+	  #geom_vline(xintercept = sud_data$data[1541]) + 
+	  labs(y="Osp per mln")
+}
+
+png("osp_all_1M.png", width=2000)
+grid.arrange(grobs = reg_list2, ncol = 5, as.table = TRUE)
+dev.off()
+
+reg_list3<-list()
+
+for(regione in pop$denominazione_regione){
+	reg_data<-subset(cases_filt_m2, denominazione_regione %in% c(regione))
+	reg_list3[[regione]] <- ggplot(data=reg_data, aes(x=data, y=rollmean(totale_ospedalizzati, 7, na.pad=TRUE), group=denominazione_regione)) +
+	  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+	  geom_line(aes(color=denominazione_regione)) +
+	  #geom_text_repel(data = camp_data[camp_data$data==max(camp_data$data), ], aes(label=paste0(round(diff_decessi/maxDeath*100, 0), " %")), direction="y", hjust = -0.5) +
+	  theme_classic() +
+	  #xlim(c(as.Date("2020-08-01"), tail(sud_data$data, n=1))) +
+	  #geom_vline(xintercept = sud_data$data[1492]) + 
+	  #geom_vline(xintercept = sud_data$data[1541]) + 
+	  labs(y="Ospedalizzati")
+}
+
+png("osp_all.png", width=2000)
+grid.arrange(grobs = reg_list3, ncol = 5, as.table = TRUE)
+dev.off()
+
+reg_list4<-list()
+
+for(regione in pop$denominazione_regione){
+	reg_data<-subset(cases_filt_m2, denominazione_regione %in% c(regione))
+	reg_list3[[regione]] <- ggplot(data=reg_data, aes(x=data, y=rollmean(terapia_intensiva, 7, na.pad=TRUE), group=denominazione_regione)) +
+	  scale_x_date(breaks='1 month', labels = date_format("%b")) +
+	  geom_line(aes(color=denominazione_regione)) +
+	  #geom_text_repel(data = camp_data[camp_data$data==max(camp_data$data), ], aes(label=paste0(round(diff_decessi/maxDeath*100, 0), " %")), direction="y", hjust = -0.5) +
+	  theme_classic() +
+	  #xlim(c(as.Date("2020-08-01"), tail(sud_data$data, n=1))) +
+	  #geom_vline(xintercept = sud_data$data[1492]) + 
+	  #geom_vline(xintercept = sud_data$data[1541]) + 
+	  labs(y="Terapie int")
+}
+
+png("ter_all.png", width=2000)
+grid.arrange(grobs = reg_list3, ncol = 5, as.table = TRUE)
+dev.off()
+
+tail(tot5agg, 3)$terapia_intensiva
+tail(tot5agg, 1)$terapia_intensiva
+
+
+waves<-cases_filt[c("denominazione_regione","data", "deceduti")]
+waves$data<-as.Date(waves$data)
+last_d<-tail(waves$data, n=1)
+
+first_w<-waves[waves$data=="2020-08-01", ]
+second_w<-waves[waves$data=="2021-02-28", ]
+third_w<-waves[waves$data==last_d, ]
+
+names(first_w)<-c("denominazione_regione", "data_first", "deceduti_first")
+names(second_w)<-c("denominazione_regione", "data_second", "deceduti_up2")
+names(third_w)<-c("denominazione_regione", "data_third", "deceduti_up3")
+
+two_w<-merge(first_w, second_w, by="denominazione_regione")
+two_w$"deceduti_second"<-two_w$deceduti_up2-two_w$deceduti_first
+three_w<-merge(two_w, third_w, by="denominazione_regione")
+three_w$"deceduti_third"<-three_w$deceduti_up3-three_w$deceduti_up2
+
+waves_p<-merge(three_w, pop, by="denominazione_regione")
+
+
+waves_p$"dec_1_ppm"<-waves_p$deceduti_first/waves_p$popolazione
+waves_p$"dec_2_ppm"<-waves_p$deceduti_second/waves_p$popolazione
+waves_p$"dec_3_ppm"<-waves_p$deceduti_third/waves_p$popolazione
+waves_p$"dec_1_perc"<-round(waves_p$"dec_1_ppm"/sum(waves_p$dec_1_ppm)*100, 2)
+waves_p$"dec_2_perc"<-round(waves_p$"dec_2_ppm"/sum(waves_p$dec_2_ppm)*100, 2)
+waves_p$"dec_3_perc"<-round(waves_p$"dec_3_ppm"/sum(waves_p$dec_3_ppm)*100, 2)
+
+waves_pca<-data.frame("dec_1_perc"=waves_p$dec_1_perc, "dec_2_perc" = waves_p$dec_2_perc, "dec_3_perc" = waves_p$dec_3_perc)
+row.names(waves_pca)<-waves_p$denominazione_regione
+waves_pca.pca<-prcomp(waves_pca, center = TRUE,scale. = TRUE)
+
+library(ggbiplot)
+png("waves.png", width=700, height=700)
+ggbiplot(waves_pca.pca,ellipse=TRUE,obs.scale = 1, var.scale = 1,var.axes=FALSE,   labels=rownames(waves_pca), groups=waves_p$Macroarea) + 
+ ggtitle(paste0("PCA of three waves "), last_d)+
+  theme_minimal()+
+  theme(legend.position = "bottom")
+dev.off()
+
+quit("yes")
+
+
+
+
